@@ -1,20 +1,27 @@
-<Query Kind="Statements">
-  <Namespace>System.Collections.Immutable</Namespace>
-  <RuntimeVersion>7.0</RuntimeVersion>
-</Query>
+<Query Kind="Statements" />
 
 using System.Collections.Immutable;
 
-var cart = Cart.CreateEmpty()
-               .WithId("1ds3d!bM")
-               .WithItem(Item.CreateEmpty()
-                                          .WithId("45xxsDg1=")
-                                          .WithProductId("ne252TJqAWk3")
-                                          .WithAmount(25))
-                  .WithTotalAmountWithoutTax(25)
-                  .Match(
-                        Valid: c => { Console.WriteLine(c); return Entity<Cart>.Valid(c); },
-                        Invalid: e => { Console.WriteLine(e); return Entity<Cart>.Invalid(e); });
+var cart = new CartBuilder()
+				.WithId("1ds3d!bM")
+				.WithItems(ImmutableList<Entity<Item>>.Empty
+					.Add(
+						new ItemBuilder()
+						.WithId("45xxsDg1=")
+						.WithProductId("ne252TJqAWk3")
+						.WithAmount(25)
+						.Build())
+					.Add(
+						new ItemBuilder()
+						.WithId("784dfg1=")
+						.WithProductId("s4ysc9DneP8")
+						.WithAmount(50)
+						.Build()))
+				.WithTotalAmountWithoutTax(75)
+				.Build()
+				.Match(
+					Valid: c => { Console.WriteLine(c); return Entity<Cart>.Valid(c); },
+					Invalid: e => { Console.WriteLine(e); return Entity<Cart>.Invalid(e); });
 
 public record Cart
 {
@@ -30,68 +37,108 @@ public record Cart
         TotalAmountWithoutTax = new Amount();
         TotalAmountWithTax = new Amount();
     }
-
-    public static Entity<Cart> CreateEmpty()
-    {
-        return new Cart();
-    }
+	
+	public static Entity<Cart> Create(string id, ImmutableList<Entity<Item>> items, int totalAmountWithoutTax, int totalAmountWithTax) 
+	{
+		return Entity<Cart>.Valid(new Cart())
+			.SetId(id)
+			.SetItems(items)
+			.SetTotalAmountWithoutTax(totalAmountWithoutTax)
+			.SetTotalAmountWithTax(totalAmountWithTax);
+	}
 }
 
-public static class CartBuilder
+public record CartBuilder 
 {
-      public static Entity<Cart> WithId(this Entity<Cart> cart, string id) 
-      {
-            return cart.SetValueObject(Identifier.Create(id), (cart, identifier) => cart with { Id = identifier });
-      }
-      
-      public static Entity<Cart> WithTotalAmountWithoutTax(this Entity<Cart> cart, int totalAmount) 
-      {
-            return cart.SetValueObject(Amount.Create(totalAmount), (cart, totalAmount) => cart with { TotalAmountWithoutTax = totalAmount });
-      }
-      
-      public static Entity<Cart> WithTotalAmountWithTax(this Entity<Cart> cart, int totalAmountWithTax) 
-      {
-            return cart.SetValueObject(Amount.Create(totalAmountWithTax), (cart, totalAmountWithTax) => cart with { TotalAmountWithTax = totalAmountWithTax });
-      }
-      
-      public static Entity<Cart> WithItem(this Entity<Cart> cart, Entity<Item> item) 
-      {
-            return cart.SetEntity(item, (cart, item) => cart with { Items = cart.Items.Add(item) });
-      }
+	private string _id { get; set; }
+	private ImmutableList<Entity<Item>> _items { get; set; }
+	private int _totalAmountWithoutTax { get; set; }
+	private int _totalAmountWithTax { get; set; }
+	
+	public CartBuilder WithId(string id) { _id = id; return this; }
+	public CartBuilder WithItems(ImmutableList<Entity<Item>> items) { _items = items; return this; }
+	public CartBuilder WithTotalAmountWithoutTax(int totalAmountWithoutTax) { _totalAmountWithoutTax = totalAmountWithoutTax; return this; }
+	public CartBuilder WithTotalAmountWithTax(int totalAmountWithTax) { _totalAmountWithTax = totalAmountWithTax; return this; }
+	public Entity<Cart> Build() => Cart.Create(_id, _items, _totalAmountWithoutTax, _totalAmountWithTax); 
+}
+
+public static class CartSetters
+{
+	public static Entity<Cart> SetId(this Entity<Cart> cart, string id) 
+	{
+		return cart.SetValueObject(Identifier.Create(id), static (cart, identifier) => cart with { Id = identifier });
+	}
+
+	public static Entity<Cart> SetTotalAmountWithoutTax(this Entity<Cart> cart, int totalAmount) 
+	{
+		return cart.SetValueObject(Amount.Create(totalAmount), static (cart, totalAmount) => cart with { TotalAmountWithoutTax = totalAmount });
+	}
+
+	public static Entity<Cart> SetTotalAmountWithTax(this Entity<Cart> cart, int totalAmountWithTax) 
+	{
+		return cart.SetValueObject(Amount.Create(totalAmountWithTax), static (cart, totalAmountWithTax) => cart with { TotalAmountWithTax = totalAmountWithTax });
+	}
+
+	public static Entity<Cart> SetItem(this Entity<Cart> cart, Entity<Item> item) 
+	{
+		return cart.SetEntity(item, static (cart, item) => cart with { Items = cart.Items.Add(item) });
+	}
+
+	public static Entity<Cart> SetItems(this Entity<Cart> cart, ImmutableList<Entity<Item>> items) 
+	{
+		return cart.SetEntityCollection(items, static (cart, items) => cart with { Items = items.ToImmutableList() });
+	}
 }
 
 public record Item 
 {
-      public Identifier Id { get; init; }
-      public Identifier ProductId { get; init; }
-      public Amount Amount { get; init; }
+	public Identifier Id { get; init; }
+	public Identifier ProductId { get; init; }
+	public Amount Amount { get; init; }
       
-    public Item()
-    {
-        Id = new Identifier();
-            ProductId = new Identifier();
-            Amount = new Amount();
-    }
-      
-    public static Entity<Item> CreateEmpty()
-    {
-        return new Item();
-    }
+	private Item()
+	{
+	    Id = new Identifier();
+		ProductId = new Identifier();
+		Amount = new Amount();
+	}
+
+	public static Entity<Item> Create(string id, string productId, int amount)
+	{
+	    return Entity<Item>.Valid(new Item())
+			.SetId(id)
+			.SetProductId(productId)
+			.SetAmount(amount);
+	}
 }
 
-public static class ItemBuilder 
+public record ItemBuilder
 {
-      public static Entity<Item> WithId(this Entity<Item> item, string id) 
+	private string _id { get; set; }
+	private string _productId { get; set; }
+	private int _amount { get; set; }
+	
+	public ItemBuilder WithId(string id) { _id = id; return this; }
+	public ItemBuilder WithProductId(string productId) { _productId = productId; return this; }
+	public ItemBuilder WithAmount(int amount) { _amount = amount; return this; }
+
+	public Entity<Item> Build() => Item.Create(_id, _productId, _amount);
+	
+}
+
+public static class ItemSetters 
+{
+      public static Entity<Item> SetId(this Entity<Item> item, string id) 
       {
             return item.SetValueObject(Identifier.Create(id), (item, identifier) => item with { Id = identifier });
       }
       
-      public static Entity<Item> WithProductId(this Entity<Item> item, string productId) 
+      public static Entity<Item> SetProductId(this Entity<Item> item, string productId) 
       {
             return item.SetValueObject(Identifier.Create(productId), (item, productId) => item with { ProductId = productId });
       }
       
-      public static Entity<Item> WithAmount(this Entity<Item> item, int amount) 
+      public static Entity<Item> SetAmount(this Entity<Item> item, int amount) 
       {
             return item.SetValueObject(Amount.Create(amount), (item, amount) => item with { Amount = amount });
       }
@@ -102,7 +149,7 @@ public record Identifier
     public const string DEFAULT_VALUE = "";
     public readonly string Value = "";
       
-      public Identifier() { Value = DEFAULT_VALUE; }
+    public Identifier() { Value = DEFAULT_VALUE; }
 
     private Identifier(string identifier)
     {
@@ -160,6 +207,12 @@ public record Error
         TypeName = this.GetType().Name;
     }
 }
+
+/////////////////////////////////////////////////////////////////////
+//
+// Extraction of Grenat.Functional.DDD
+//
+////////////////////////////////////////////////////////////////////
 
 
 public class ValueObject<T>
@@ -235,5 +288,39 @@ public static class Entity
             Valid: v => parentEntity.Match(
                                 Valid: t => Entity<T>.Valid(setter(t, v)),
                                 Invalid: e => parentEntity));
+    }
+	
+    public static Entity<T> SetEntityCollection<T, E>(this Entity<T> parentEntity, IEnumerable<Entity<E>> entities, Func<T, IEnumerable<E>, T> setter)
+    {
+        var validValues = new List<E>();
+        var errors = new List<Error>();
+
+        foreach (var entity in entities)
+        {
+            if (entity.IsValid)
+            {
+                validValues.Add(
+                    entity.Match(
+                        Valid: v => v,
+                        Invalid: e => default!
+                    ));
+            }
+            else
+            {
+                errors.AddRange(
+                    entity.Match(
+                        Valid: v => default!,
+                        Invalid: e => e)
+                );
+            }
+        }
+
+        if (errors.Count > 0) return Entity<T>.Invalid(errors);
+        else
+        {
+            return parentEntity.Match(
+                Invalid: e => Entity<T>.Invalid(e.Concat(parentEntity.Errors)),
+                Valid: v => Entity<T>.Valid(setter(v, validValues)));
+        }
     }
 }
